@@ -6,6 +6,8 @@ import com.simplemarket.orderservice.dto.OrderRequest;
 import com.simplemarket.orderservice.model.Order;
 import com.simplemarket.orderservice.model.OrderLineItems;
 import com.simplemarket.orderservice.repository.OrderRepository;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +24,7 @@ public class OrderService {
 
     private final OrderRepository orderRepository;
     private final WebClient.Builder webClientBuilder;
+    private final Tracer tracer;
     public String placeOrder(OrderRequest orderRequest){
         Order order = new Order();
         order.setOrderNumber(UUID.randomUUID().toString());
@@ -35,6 +38,8 @@ public class OrderService {
         order.setOrderLineItemsList(orderLineItems);
 
         List<String> skuCodes = order.getOrderLineItemsList().stream().map(orderLineItems1 -> orderLineItems1.getSkuCode()).toList();
+        Span inventoryServiceLookup = tracer.nextSpan().name("InventoryServiceLookup");
+        try(Tracer.SpanInScope spanInScope = tracer.withSpan(inventoryServiceLookup.start())){
 
         //Call the inventory service and place order if product is in stock
         InventoryResponse[] inventoryResponseArray = webClientBuilder.build().get().uri("http://inventory-service/api/inventory",
@@ -49,6 +54,9 @@ public class OrderService {
             return "Order Placed Successfully";
         }else{
             throw new IllegalArgumentException("One or more product not in stock");
+        }
+        }finally {
+            inventoryServiceLookup.end();
         }
 
     }
