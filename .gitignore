@@ -31,3 +31,9 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Docker things ###
+mongo-product
+mysql-keycloak-data
+postgres-order
+grafana
